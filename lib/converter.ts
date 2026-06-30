@@ -28,8 +28,8 @@ function escapeHtml(s: string): string {
 
 /** CSS for interactive placeholder fields injected into the output HTML. */
 const PLACEHOLDER_CSS = `
-.pf-field{position:absolute;border:none;outline:none;background:transparent;padding:0;margin:0;color:transparent;cursor:text;caret-color:#1a1a1a;line-height:1;overflow:hidden;text-overflow:clip;white-space:pre;resize:none;box-sizing:border-box;font-family:inherit;min-width:0;min-height:0}
-.pf-field:focus{color:#000;background:rgba(200,200,200,.08)}
+.pf-field{position:absolute;border:none;outline:none;background:#fff;padding:0;margin:0;color:transparent;cursor:text;caret-color:#1a1a1a;line-height:1;overflow:hidden;text-overflow:clip;white-space:pre;resize:none;box-sizing:border-box;font-family:inherit;min-width:0;min-height:0}
+.pf-field:focus{color:#000;background:#fff}
 .pf-field.filled{color:#000}
 `;
 
