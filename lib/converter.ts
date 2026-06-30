@@ -1,3 +1,5 @@
+import { detectPlaceholder, renderPlaceholderField, type PlaceholderPosition } from "./placeholder-parser";
+
 export interface ConversionCallbacks {
   onProgress: (current: number, total: number) => void;
   onStatus: (message: string) => void;
@@ -24,6 +26,18 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** CSS for interactive placeholder fields injected into the output HTML. */
+const PLACEHOLDER_CSS = `
+.pf-field{position:absolute;border:none;outline:none;background:transparent;padding:0;margin:0;color:transparent;cursor:text;caret-color:#1a1a1a;line-height:1;overflow:hidden;text-overflow:clip;white-space:pre;resize:none;box-sizing:border-box;font-family:inherit;min-width:0;min-height:0}
+.pf-field:focus{color:#000;background:rgba(200,200,200,.08)}
+.pf-field.filled{color:#000}
+`;
+
+/** Inline script that toggles a "filled" class on .pf-field elements. */
+const PLACEHOLDER_SCRIPT = `<script>
+(function(){document.querySelectorAll(".pf-field").forEach(function(e){function t(){e.classList.toggle("filled",e.value!=="")}e.addEventListener("input",t),t()})})();
+</script>`;
+
 function buildOutputHtml(filename: string, pagesHtml: string): string {
   const title = escapeHtml(filename.replace(/\.pdf$/i, ""));
   return `<!DOCTYPE html>
@@ -41,10 +55,12 @@ body{background:#525659;padding:24px 16px;display:flex;flex-direction:column;ali
 .tl span{position:absolute;color:transparent;white-space:pre;cursor:text;line-height:1;overflow:hidden}
 .tl span::selection{background:rgba(0,90,210,.32);color:transparent}
 ::-moz-selection{background:rgba(0,90,210,.32)}
+${PLACEHOLDER_CSS}
 </style>
 </head>
 <body>
  ${pagesHtml}
+${PLACEHOLDER_SCRIPT}
 </body>
 </html>`;
 }
@@ -118,6 +134,23 @@ export async function convertPdfToHtml(
       const htmlY = dispVP.height - ty;
       const spanW = item.width || item.str.length * fs * 0.55;
       const spanH = fs * 1.2;
+
+      // Check if this text item is an interactive placeholder
+      const placeholderType = detectPlaceholder(item.str);
+      if (placeholderType) {
+        const pos: PlaceholderPosition = {
+          left: htmlX,
+          top: htmlY - fs * 0.82,
+          width: spanW,
+          height: spanH,
+          fontSize: fs,
+        };
+        const fieldHtml = renderPlaceholderField(placeholderType, pos);
+        if (fieldHtml) {
+          spans += fieldHtml + "\n";
+          continue;
+        }
+      }
 
       spans += `<span style="left:${htmlX.toFixed(1)}px;top:${(htmlY - fs * 0.82).toFixed(1)}px;font-size:${fs.toFixed(1)}px;width:${spanW.toFixed(1)}px;height:${spanH.toFixed(1)}px;">${escapeHtml(item.str)}</span>\n`;
     }
