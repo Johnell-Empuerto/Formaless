@@ -6,6 +6,7 @@ export interface ConversionCallbacks {
 export interface ConversionResult {
   html: string;
   pageCount: number;
+  pages: string[];
 }
 
 /** Minimal shape we need from pdfjs-dist TextItem */
@@ -74,6 +75,7 @@ export async function convertPdfToHtml(
   );
 
   let pagesHtml = "";
+  const pages: string[] = [];
 
   for (let i = 1; i <= numPages; i++) {
     const page = await pdf.getPage(i);
@@ -123,11 +125,14 @@ export async function convertPdfToHtml(
     const pw = Math.round(dispVP.width);
     const ph = Math.round(dispVP.height);
 
-    pagesHtml +=
+    const pageDiv =
       `  <div class="page" style="width:${pw}px;height:${ph}px;">\n` +
       `    <img src="${imgSrc}" width="${pw}" height="${ph}" alt="Page ${i}">\n` +
       (spans ? `    <div class="tl">\n${spans}    </div>\n` : "") +
-      `  </div>\n\n`;
+      `  </div>`;
+
+    pagesHtml += pageDiv + "\n\n";
+    pages.push(buildOutputHtml(file.name, pageDiv));
 
     /* ── Report progress ── */
     callbacks.onProgress(i, numPages);
@@ -144,5 +149,6 @@ export async function convertPdfToHtml(
   return {
     html: buildOutputHtml(file.name, pagesHtml),
     pageCount: numPages,
+    pages,
   };
 }

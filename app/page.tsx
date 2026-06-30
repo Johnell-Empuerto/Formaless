@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import UploadZone from "@/components/UploadZone";
 import ProcessingView from "@/components/ProcessingView";
-import ResultView from "@/components/ResultView";
 import ErrorView from "@/components/ErrorView";
 import ToastContainer, { type Toast } from "@/components/ToastContainer";
+import { useDocument } from "@/context/DocumentContext";
 import { convertPdfToHtml } from "@/lib/converter";
 
-type AppState = "upload" | "processing" | "result" | "error";
+type AppState = "upload" | "processing" | "error";
 
 export default function Home() {
   const [state, setState] = useState<AppState>("upload");
@@ -16,12 +17,9 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [statusText, setStatusText] = useState("");
-  const [html, setHtml] = useState("");
-  const [fileName, setFileName] = useState("");
-  const [pageCount, setPageCount] = useState(0);
-  const [inputSize, setInputSize] = useState(0);
-  const [outputSize, setOutputSize] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
+  const { setDocument } = useDocument();
+  const router = useRouter();
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   // Guards against stale conversions if user triggers multiple quickly
@@ -47,11 +45,6 @@ export default function Home() {
     setCurrentPage(0);
     setTotalPages(0);
     setStatusText("");
-    setHtml("");
-    setFileName("");
-    setPageCount(0);
-    setInputSize(0);
-    setOutputSize(0);
     setErrorMsg("");
   }, []);
 
@@ -99,17 +92,13 @@ export default function Home() {
         // Bail if a newer conversion was started
         if (conversionGen.current !== gen) return;
 
-        const outBytes = new Blob([result.html], { type: "text/html" }).size;
-
-        setHtml(result.html);
-        setFileName(file.name);
-        setPageCount(result.pageCount);
-        setInputSize(file.size);
-        setOutputSize(outBytes);
-        setState("result");
-        addToast(
-          `${result.pageCount} page${result.pageCount !== 1 ? "s" : ""} converted successfully`,
-        );
+        /* ── Store in context and navigate to document viewer ── */
+        setDocument({
+          pages: result.pages,
+          fileName: file.name,
+          pageCount: result.pageCount,
+        });
+        router.push("/document");
       } catch (err: unknown) {
         if (conversionGen.current !== gen) return;
         console.error("Conversion error:", err);
@@ -177,17 +166,6 @@ export default function Home() {
             current={currentPage}
             total={totalPages}
             status={statusText}
-          />
-        )}
-
-        {state === "result" && (
-          <ResultView
-            html={html}
-            fileName={fileName}
-            pageCount={pageCount}
-            inputSize={inputSize}
-            outputSize={outputSize}
-            onNewFile={reset}
           />
         )}
 

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { DocumentProvider } from "@/context/DocumentContext";
 
 export const metadata: Metadata = {
-  title: "PDF to HTML Converter",
+  title: "Formaless — Paperless Document System",
   description:
     "Convert PDF documents into standalone HTML files — 100% client-side, no uploads, no servers.",
 };
@@ -24,7 +25,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <DocumentProvider>{children}</DocumentProvider>
+      </body>
     </html>
   );
 }
