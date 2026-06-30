@@ -807,20 +807,8 @@ body::after {
   align-items: flex-start;
   justify-content: center;
   overflow: auto;
-  padding: 24px 16px;
+
   background: #525659;
-  background-image:
-    linear-gradient(45deg, #484b4e 25%, transparent 25%),
-    linear-gradient(-45deg, #484b4e 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #484b4e 75%),
-    linear-gradient(-45deg, transparent 75%, #484b4e 75%);
-  background-size: 20px 20px;
-  background-position:
-    0 0,
-    0 10px,
-    10px -10px,
-    -10px 0px;
-  cursor: default;
 }
 
 .viewer-page-wrap {
