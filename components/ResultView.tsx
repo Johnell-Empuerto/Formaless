@@ -1,15 +1,11 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
-
 interface ResultViewProps {
   html: string;
   fileName: string;
   pageCount: number;
   inputSize: number;
   outputSize: number;
-  onDownload: () => void;
-  onOpenTab: () => void;
   onNewFile: () => void;
 }
 
@@ -25,39 +21,8 @@ export default function ResultView({
   pageCount,
   inputSize,
   outputSize,
-  onDownload,
-  onOpenTab,
   onNewFile,
 }: ResultViewProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  // Reset iframe height when html changes
-  useEffect(() => {
-    if (iframeRef.current) {
-      iframeRef.current.style.height = "600px";
-    }
-  }, [html]);
-
-  const handleIframeLoad = useCallback(() => {
-    try {
-      const doc =
-        iframeRef.current?.contentDocument ||
-        iframeRef.current?.contentWindow?.document;
-      if (doc) {
-        const h = Math.max(
-          doc.documentElement.scrollHeight,
-          doc.body.scrollHeight,
-          400,
-        );
-        if (iframeRef.current) {
-          iframeRef.current.style.height = Math.min(h + 60, 2400) + "px";
-        }
-      }
-    } catch {
-      // Cross-origin blocked — fallback height is already set
-    }
-  }, []);
-
   return (
     <div className="state-card active">
       <div className="result-toolbar">
@@ -76,13 +41,7 @@ export default function ResultView({
         </div>
 
         <div className="result-actions">
-          <button className="btn btn-primary" onClick={onDownload}>
-            <i className="fas fa-download" /> Download HTML
-          </button>
-          <button className="btn btn-outline" onClick={onOpenTab}>
-            <i className="fas fa-external-link-alt" /> Open in Tab
-          </button>
-          <button className="btn btn-ghost" onClick={onNewFile}>
+          <button className="btn btn-outline" onClick={onNewFile}>
             <i className="fas fa-plus" /> New File
           </button>
         </div>
@@ -90,10 +49,8 @@ export default function ResultView({
 
       <div className="preview-wrap">
         <iframe
-          ref={iframeRef}
-          title="Converted HTML Preview"
+          title="Converted Document"
           srcDoc={html}
-          onLoad={handleIframeLoad}
         />
       </div>
     </div>

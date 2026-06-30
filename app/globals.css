@@ -551,7 +551,7 @@ body::after {
   color: var(--fg);
 }
 
-/* ── Preview ── */
+/* ── Preview / Document Viewer ── */
 .preview-wrap {
   background: #484b4e;
   background-image:
@@ -567,7 +567,8 @@ body::after {
     -10px 0px;
   padding: 32px 24px;
   overflow: auto;
-  max-height: 75vh;
+  height: calc(100vh - 260px);
+  min-height: 400px;
   display: flex;
   justify-content: center;
 }
@@ -580,7 +581,7 @@ body::after {
   background: white;
   border-radius: 2px;
   max-width: 100%;
-  transition: height 0.3s ease;
+  height: 100%;
 }
 
 /* ── Error ── */

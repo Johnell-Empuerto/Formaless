@@ -131,26 +131,6 @@ export default function Home() {
     [addToast],
   );
 
-  /* ── Download handler ── */
-  const handleDownload = useCallback(() => {
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = fileName.replace(/\.pdf$/i, ".html");
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(a.href);
-    addToast("HTML file downloaded");
-  }, [html, fileName, addToast]);
-
-  /* ── Open in new tab ── */
-  const handleOpenTab = useCallback(() => {
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    window.open(URL.createObjectURL(blob), "_blank");
-    addToast("Opened in new tab");
-  }, [html, addToast]);
-
   return (
     <>
       <div className="container">
@@ -207,8 +187,6 @@ export default function Home() {
             pageCount={pageCount}
             inputSize={inputSize}
             outputSize={outputSize}
-            onDownload={handleDownload}
-            onOpenTab={handleOpenTab}
             onNewFile={reset}
           />
         )}
