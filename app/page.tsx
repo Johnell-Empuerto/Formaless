@@ -1,65 +1,222 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useCallback, useRef } from "react";
+import UploadZone from "@/components/UploadZone";
+import ProcessingView from "@/components/ProcessingView";
+import ResultView from "@/components/ResultView";
+import ErrorView from "@/components/ErrorView";
+import ToastContainer, { type Toast } from "@/components/ToastContainer";
+import { convertPdfToHtml } from "@/lib/converter";
+
+type AppState = "upload" | "processing" | "result" | "error";
 
 export default function Home() {
+  const [state, setState] = useState<AppState>("upload");
+  const [progress, setProgress] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [statusText, setStatusText] = useState("");
+  const [html, setHtml] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [pageCount, setPageCount] = useState(0);
+  const [inputSize, setInputSize] = useState(0);
+  const [outputSize, setOutputSize] = useState(0);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Guards against stale conversions if user triggers multiple quickly
+  const conversionGen = useRef(0);
+
+  /* ── Toast helpers ── */
+  const addToast = useCallback(
+    (msg: string, type: "success" | "error" = "success") => {
+      const id = Date.now() + Math.random();
+      setToasts((prev) => [...prev, { id, msg, type }]);
+    },
+    [],
+  );
+
+  const removeToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  /* ── Reset to upload state ── */
+  const reset = useCallback(() => {
+    setState("upload");
+    setProgress(0);
+    setCurrentPage(0);
+    setTotalPages(0);
+    setStatusText("");
+    setHtml("");
+    setFileName("");
+    setPageCount(0);
+    setInputSize(0);
+    setOutputSize(0);
+    setErrorMsg("");
+  }, []);
+
+  /* ── Core file handler ── */
+  const handleFile = useCallback(
+    async (file: File) => {
+      // Validate type
+      if (file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) {
+        setErrorMsg("Please select a valid PDF file.");
+        setState("error");
+        addToast("Please select a valid PDF file.", "error");
+        return;
+      }
+
+      // Validate size (100 MB)
+      if (file.size > 100 * 1048576) {
+        setErrorMsg("File exceeds the 100 MB limit. Try a smaller file.");
+        setState("error");
+        addToast("File exceeds the 100 MB limit.", "error");
+        return;
+      }
+
+      // Begin processing
+      const gen = ++conversionGen.current;
+      setState("processing");
+      setStatusText("Loading document...");
+      setProgress(0);
+      setCurrentPage(0);
+      setTotalPages(0);
+
+      try {
+        const result = await convertPdfToHtml(file, {
+          onProgress: (cur, tot) => {
+            if (conversionGen.current !== gen) return;
+            setProgress(Math.round((cur / tot) * 100));
+            setCurrentPage(cur);
+            setTotalPages(tot);
+          },
+          onStatus: (msg) => {
+            if (conversionGen.current !== gen) return;
+            setStatusText(msg);
+          },
+        });
+
+        // Bail if a newer conversion was started
+        if (conversionGen.current !== gen) return;
+
+        const outBytes = new Blob([result.html], { type: "text/html" }).size;
+
+        setHtml(result.html);
+        setFileName(file.name);
+        setPageCount(result.pageCount);
+        setInputSize(file.size);
+        setOutputSize(outBytes);
+        setState("result");
+        addToast(
+          `${result.pageCount} page${result.pageCount !== 1 ? "s" : ""} converted successfully`,
+        );
+      } catch (err: unknown) {
+        if (conversionGen.current !== gen) return;
+        console.error("Conversion error:", err);
+
+        let msg = "An unexpected error occurred while converting the PDF.";
+        if (err instanceof Error) {
+          if (err.name === "PasswordException")
+            msg =
+              "This PDF is password-protected and cannot be processed in the browser.";
+          else if (err.name === "InvalidPDFException")
+            msg = "The file does not appear to be a valid or intact PDF.";
+          else if (err.message && err.message.length < 200) msg = err.message;
+        }
+        setErrorMsg(msg);
+        setState("error");
+        addToast(msg, "error");
+      }
+    },
+    [addToast],
+  );
+
+  /* ── Download handler ── */
+  const handleDownload = useCallback(() => {
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName.replace(/\.pdf$/i, ".html");
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+    addToast("HTML file downloaded");
+  }, [html, fileName, addToast]);
+
+  /* ── Open in new tab ── */
+  const handleOpenTab = useCallback(() => {
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    window.open(URL.createObjectURL(blob), "_blank");
+    addToast("Opened in new tab");
+  }, [html, addToast]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <>
+      <div className="container">
+        {/* Header */}
+        <header className="header anim-in">
+          <div className="header-badge">
+            <i className="fas fa-lock" /> 100% Client-Side
+          </div>
+          <div className="header-icon">
+            <i className="fas fa-file-code" />
+          </div>
+          <h1>
+            PDF to <span>HTML</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p>
+            Convert your PDF documents into standalone HTML files. Everything
+            runs locally in your browser — no uploads, no servers.
           </p>
+        </header>
+
+        {/* Features */}
+        <div className="features anim-in anim-in-d1">
+          <div className="feature-chip">
+            <i className="fas fa-shield-halved" /> Private &amp; Secure
+          </div>
+          <div className="feature-chip">
+            <i className="fas fa-bolt" /> Instant Conversion
+          </div>
+          <div className="feature-chip">
+            <i className="fas fa-font" /> Selectable Text
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        {/* Conditional view rendering */}
+        {state === "upload" && (
+          <div className="anim-in anim-in-d2">
+            <UploadZone onFileSelect={handleFile} />
+          </div>
+        )}
+
+        {state === "processing" && (
+          <ProcessingView
+            progress={progress}
+            current={currentPage}
+            total={totalPages}
+            status={statusText}
+          />
+        )}
+
+        {state === "result" && (
+          <ResultView
+            html={html}
+            fileName={fileName}
+            pageCount={pageCount}
+            inputSize={inputSize}
+            outputSize={outputSize}
+            onDownload={handleDownload}
+            onOpenTab={handleOpenTab}
+            onNewFile={reset}
+          />
+        )}
+
+        {state === "error" && <ErrorView message={errorMsg} onRetry={reset} />}
+      </div>
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+    </>
   );
 }
