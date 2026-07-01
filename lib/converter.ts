@@ -50,7 +50,7 @@ function buildOutputHtml(filename: string, pagesHtml: string): string {
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#525659;padding:24px 16px;display:flex;flex-direction:column;align-items:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 .page{position:relative;margin:18px 0;box-shadow:0 2px 14px rgba(0,0,0,.38);overflow:hidden;background:#fff;flex-shrink:0}
-.page img{display:block}
+.page img{display:block;image-rendering:crisp-edges;image-rendering:-webkit-optimize-contrast;-ms-interpolation-mode:nearest-neighbor}
 .tl{position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden;font-size:1px;line-height:1}
 .pdf24_01{position:absolute;white-space:pre;color:#000;cursor:text;overflow:hidden}
 .pdf24_01::selection{background:rgba(0,90,210,.32);color:#000}
@@ -83,9 +83,9 @@ export async function convertPdfToHtml(
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-  // Scale render buffer for high-DPI displays (minimum 2× supersampling)
+  // Scale render buffer for high-DPI displays (minimum 3× for sharp background zoom)
   const dpr = window.devicePixelRatio || 1;
-  const RENDER_SCALE = Math.max(2, Math.ceil(dpr * 1.5));
+  const RENDER_SCALE = Math.max(3, Math.ceil(dpr * 1.8));
 
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
