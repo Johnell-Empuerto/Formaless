@@ -36,7 +36,7 @@ interface DocumentContextValue {
 const DocumentContext = createContext<DocumentContextValue | null>(null);
 
 const ZOOM_MIN = 0.25;
-const ZOOM_MAX = 2.0;
+const ZOOM_MAX = 3.0;
 const ZOOM_STEP = 0.1;
 
 export function DocumentProvider({ children }: { children: ReactNode }) {
