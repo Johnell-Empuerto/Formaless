@@ -1,4 +1,5 @@
 import { detectPlaceholder, renderPlaceholderField, type PlaceholderPosition } from "./placeholder-parser";
+import { extractSVG } from "./svg-extractor";
 
 export interface ConversionCallbacks {
   onProgress: (current: number, total: number) => void;
@@ -17,7 +18,6 @@ interface TextItemLike {
   transform: number[];
   width?: number;
 }
-
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -51,10 +51,13 @@ function buildOutputHtml(filename: string, pagesHtml: string): string {
 body{background:#525659;padding:24px 16px;display:flex;flex-direction:column;align-items:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 .page{position:relative;margin:18px 0;box-shadow:0 2px 14px rgba(0,0,0,.38);overflow:hidden;background:#fff;flex-shrink:0}
 .page img{display:block}
-.tl{position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden}
-.tl span{position:absolute;color:transparent;white-space:pre;cursor:text;line-height:1;overflow:hidden}
-.tl span::selection{background:rgba(0,90,210,.32);color:transparent}
+.tl{position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden;font-size:1px;line-height:1}
+.pdf24_01{position:absolute;white-space:pre;color:#000;cursor:text;overflow:hidden}
+.pdf24_01::selection{background:rgba(0,90,210,.32);color:#000}
+.pdf24_01 span{color:#000}
 ::-moz-selection{background:rgba(0,90,210,.32)}
+.pf-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
+.pf-svg path{vector-effect:non-scaling-stroke}
 ${PLACEHOLDER_CSS}
 </style>
 </head>
@@ -80,7 +83,9 @@ export async function convertPdfToHtml(
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-  const RENDER_SCALE = 2;
+  // Scale render buffer for high-DPI displays (minimum 2× supersampling)
+  const dpr = window.devicePixelRatio || 1;
+  const RENDER_SCALE = Math.max(2, Math.ceil(dpr * 1.5));
 
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
@@ -98,6 +103,13 @@ export async function convertPdfToHtml(
     const renderVP = page.getViewport({ scale: RENDER_SCALE });
     const dispVP = page.getViewport({ scale: 1 });
 
+    /* ── Extract operator list for SVG generation ── */
+    const [opList, tc] = await Promise.all([
+      page.getOperatorList(),
+      page.getTextContent(),
+    ]);
+    const svgResult = extractSVG(opList, dispVP.height, dispVP.transform, pdfjsLib.OPS);
+
     /* ── Render page to off-screen canvas ── */
     const canvas = document.createElement("canvas");
     canvas.width = renderVP.width;
@@ -109,10 +121,8 @@ export async function convertPdfToHtml(
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: ctx, viewport: renderVP }).promise;
 
-    const imgSrc = canvas.toDataURL("image/jpeg", 0.92);
+    const imgSrc = canvas.toDataURL("image/png");
 
-    /* ── Extract text layer with absolute positions ── */
-    const tc = await page.getTextContent();
     let spans = "";
 
     for (const rawItem of tc.items) {
@@ -152,7 +162,9 @@ export async function convertPdfToHtml(
         }
       }
 
-      spans += `<span style="left:${htmlX.toFixed(1)}px;top:${(htmlY - fs * 0.82).toFixed(1)}px;font-size:${fs.toFixed(1)}px;width:${spanW.toFixed(1)}px;height:${spanH.toFixed(1)}px;">${escapeHtml(item.str)}</span>\n`;
+      // pdf24-style: visible text on PNG background using em units
+      // Base font-size on .tl is 1px → 1em = 1px for exact positioning
+      spans += `<div class="pdf24_01" style="left:${htmlX.toFixed(4)}em;top:${(htmlY - fs * 0.82).toFixed(4)}em;font-size:${fs.toFixed(4)}em;width:${spanW.toFixed(4)}em;height:${spanH.toFixed(4)}em"><span>${escapeHtml(item.str)}</span></div>\n`;
     }
 
     const pw = Math.round(dispVP.width);
@@ -162,6 +174,7 @@ export async function convertPdfToHtml(
       `  <div class="page" style="width:${pw}px;height:${ph}px;">\n` +
       `    <img src="${imgSrc}" width="${pw}" height="${ph}" alt="Page ${i}">\n` +
       (spans ? `    <div class="tl">\n${spans}    </div>\n` : "") +
+      (svgResult.svg ? `    ${svgResult.svg}\n` : "") +
       `  </div>`;
 
     pagesHtml += pageDiv + "\n\n";
